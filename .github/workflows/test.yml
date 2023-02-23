@@ -1,0 +1,45 @@
+name: test
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Environment preparation
+        id: prep
+        run: |
+          set -x
+          rustup toolchain update --no-self-update stable
+          rustup default stable
+          rustup component add clippy rustfmt
+          rustup show
+          rustc --version | awk '{print $2}' | tee RUSTC_VER
+          echo "rustc_ver=$(cat RUSTC_VER)" >> $GITHUB_OUTPUT
+      - name: Cache for Rust
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ github.workflow }}|${{ runner.os }}|cargo|00|${{ steps.prep.outputs.rustc_ver }}|${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ github.workflow }}|${{ runner.os }}|cargo|00|${{ steps.prep.outputs.rustc_ver }}|
+
+      - name: Run rustfmt
+        run: cargo fmt --all --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -Dwarnings
+
+      - name: Run tests
+        run: cargo test --workspace -- --nocapture

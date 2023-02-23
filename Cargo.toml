@@ -1,0 +1,18 @@
+[package]
+name = "str-cat"
+version = "0.1.0"
+edition = "2021"
+license = "BSD-3-Clause"
+description = "Efficiently concatenate strings without extra side-effects."
+repository = "https://github.com/Equim-chan/str-cat"
+keywords = ["concat", "string", "buffers"]
+categories = ["value-formatting"]
+
+[dependencies]
+
+[dev-dependencies]
+criterion = "0.4"
+
+[[bench]]
+name = "benchmark"
+harness = false
