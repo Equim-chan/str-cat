@@ -1,27 +1,30 @@
 //! This crate provides macros to efficiently concatenate strings without extra
-//! side-effects.
+//! side-effect.
 //!
-//! Basic usage:
-//!
+//! # Usage
+//! ## Basic usage
 //! ```
 //! use str_cat::str_cat;
 //!
-//! let s = str_cat!("Hello", " ", "World", "!");
+//! let world = "World".to_owned(); // not a literal, so you can't use `concat!`
+//! let s = str_cat!("Hello", " ", world, "!");
 //! assert_eq!(s, "Hello World!");
 //! ```
 //!
-//! Which is roughly equivalent to
+//! which is roughly equivalent to
 //!
 //! ```
-//! let mut s = String::with_capacity("Hello".len() + " ".len() + "World".len() + "!".len());
+//! # let world = "World".to_owned();
+//! let mut s = String::with_capacity("Hello".len() + " ".len() + world.len() + "!".len());
 //! s.push_str("Hello");
 //! s.push_str(" ");
-//! s.push_str("World");
+//! s.push_str(&world);
 //! s.push_str("!");
 //! ```
 //!
-//! The macro runs without extra side-effects, which means all involved
-//! expressions are evaluated only once.
+//! ## No extra side-effect
+//! The macro runs without extra side-effect, which means all involved
+//! expressions are evaluated exactly once.
 //!
 //! ```
 //! # use str_cat::str_cat;
@@ -35,17 +38,27 @@
 //! assert_eq!(get_world_calls, 1);
 //! ```
 //!
-//! Custom minimum capacity.
+//! which is roughly equivalent to
 //!
+//! ```
+//! # let get_world = || "World";
+//! let world = get_world(); // evaluate the expression and store it for later use
+//! let mut s = String::with_capacity("Hello".len() + " ".len() + world.len() + "!".len());
+//! s.push_str("Hello");
+//! s.push_str(" ");
+//! s.push_str(&world);
+//! s.push_str("!");
+//! ```
+//!
+//! ## Append to an existing string
 //! ```
 //! # use str_cat::str_cat;
-//! let s = str_cat!(String::with_capacity(16); "foo", "bar");
-//! assert_eq!(s, "foobar");
-//! assert_eq!(s.capacity(), 16);
+//! let mut s = "Hello".to_owned();
+//! str_cat!(&mut s; " ", "World!");
+//! assert_eq!(s, "Hello World!");
 //! ```
 //!
-//! Reuse existing allocation.
-//!
+//! ## Reuse existing allocation
 //! ```
 //! # use str_cat::str_cat;
 //! let mut s = "Hello World!".to_owned();
@@ -53,15 +66,24 @@
 //! let cap = s.capacity();
 //!
 //! s.clear();
-//! str_cat!(&mut s; "World!");
-//! assert_eq!(s, "World!");
+//! str_cat!(&mut s; "Hello");
+//! assert_eq!(s, "Hello");
 //! // Did not grow
 //! assert_eq!(s.as_ptr(), ptr);
 //! assert_eq!(s.capacity(), cap);
 //! ```
 //!
+//! ## Custom minimum capacity
+//! ```
+//! # use str_cat::str_cat;
+//! let s = str_cat!(String::with_capacity(16); "foo", "bar");
+//! assert_eq!(s, "foobar");
+//! assert!(s.capacity() >= 16);
+//! ```
+//!
+//! ## Argument types
 //! Works with any expressions that can dereference to [`str`](str) when
-//! evaluated. Although it would be more simple and efficient to use
+//! evaluated. Although it should be more simple and efficient to use
 //! [`format!`](format) instead when you can't avoid explicit `.to_string()`
 //! calls.
 //!
@@ -78,6 +100,7 @@
 //! assert_eq!(s, "Hello World!123456");
 //! ```
 //!
+//! ## Variants
 //! There are also variants for [`PathBuf`](std::path::PathBuf),
 //! [`OsString`](std::ffi::OsString) and [`Vec`](Vec).
 //!
@@ -115,23 +138,23 @@
 /// ```
 #[macro_export]
 macro_rules! str_cat {
-    (@stack $input:ident, $new_len:ident; $($values_coerced:ident,)*;) => {
-        $input.reserve($input.len() + $new_len);
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*;) => {
+        $input.reserve($additional);
         $($input.push_str($values_coerced);)*
     };
 
-    (@stack $input:ident, $new_len:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
         let value = $head;
         let value_coerced: &str = &*value;
-        $new_len += value_coerced.len();
-        $crate::str_cat!(@stack $input, $new_len; $($values_coerced,)* value_coerced,; $($tail,)*);
+        $additional += value_coerced.len();
+        $crate::str_cat!(@stack $input, $additional; $($values_coerced,)* value_coerced,; $($tail,)*);
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
         #[allow(unused_mut)]
         let mut input = $input;
-        let mut new_len = 0;
-        $crate::str_cat!(@stack input, new_len; ; $($el,)*);
+        let mut additional = 0;
+        $crate::str_cat!(@stack input, additional; ; $($el,)*);
         input
     }};
 
@@ -161,23 +184,23 @@ macro_rules! str_cat {
 /// ```
 #[macro_export]
 macro_rules! path_cat {
-    (@stack $input:ident, $new_len:ident; $($values_coerced:ident,)*;) => {
-        $input.reserve($input.as_os_str().len() + $new_len);
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*;) => {
+        $input.reserve($additional);
         $($input.push($values_coerced);)*
     };
 
-    (@stack $input:ident, $new_len:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
         let value = $head;
         let value_coerced = ::core::convert::AsRef::<::std::path::Path>::as_ref(&value);
-        $new_len += value_coerced.as_os_str().len();
-        $crate::path_cat!(@stack $input, $new_len; $($values_coerced,)* value_coerced,; $($tail,)*);
+        $additional += value_coerced.as_os_str().len();
+        $crate::path_cat!(@stack $input, $additional; $($values_coerced,)* value_coerced,; $($tail,)*);
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
         #[allow(unused_mut)]
         let mut input = $input;
-        let mut new_len = 0;
-        $crate::path_cat!(@stack input, new_len; ; $($el,)*);
+        let mut additional = 0;
+        $crate::path_cat!(@stack input, additional; ; $($el,)*);
         input
     }};
 
@@ -207,23 +230,23 @@ macro_rules! path_cat {
 /// ```
 #[macro_export]
 macro_rules! os_str_cat {
-    (@stack $input:ident, $new_len:ident; $($values_coerced:ident,)*;) => {
-        $input.reserve($input.len() + $new_len);
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*;) => {
+        $input.reserve($additional);
         $($input.push($values_coerced);)*
     };
 
-    (@stack $input:ident, $new_len:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
         let value = $head;
         let value_coerced = ::core::convert::AsRef::<::std::ffi::OsStr>::as_ref(&value);
-        $new_len += value_coerced.len();
-        $crate::os_str_cat!(@stack $input, $new_len; $($values_coerced,)* value_coerced,; $($tail,)*);
+        $additional += value_coerced.len();
+        $crate::os_str_cat!(@stack $input, $additional; $($values_coerced,)* value_coerced,; $($tail,)*);
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
         #[allow(unused_mut)]
         let mut input = $input;
-        let mut new_len = 0;
-        $crate::os_str_cat!(@stack input, new_len; ; $($el,)*);
+        let mut additional = 0;
+        $crate::os_str_cat!(@stack input, additional; ; $($el,)*);
         input
     }};
 
@@ -251,23 +274,23 @@ macro_rules! os_str_cat {
 /// ```
 #[macro_export]
 macro_rules! vec_cat {
-    (@stack $input:ident, $new_len:ident; $($values_coerced:ident,)*;) => {
-        $input.reserve($input.len() + $new_len);
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*;) => {
+        $input.reserve($additional);
         $($input.extend_from_slice($values_coerced);)*
     };
 
-    (@stack $input:ident, $new_len:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
         let value = $head;
         let value_coerced = &*value;
-        $new_len += value_coerced.len();
-        $crate::vec_cat!(@stack $input, $new_len; $($values_coerced,)* value_coerced,; $($tail,)*);
+        $additional += value_coerced.len();
+        $crate::vec_cat!(@stack $input, $additional; $($values_coerced,)* value_coerced,; $($tail,)*);
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
         #[allow(unused_mut)]
         let mut input = $input;
-        let mut new_len = 0;
-        $crate::vec_cat!(@stack input, new_len; ; $($el,)*);
+        let mut additional = 0;
+        $crate::vec_cat!(@stack input, additional; ; $($el,)*);
         input
     }};
 
