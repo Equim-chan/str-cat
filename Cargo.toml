@@ -5,6 +5,7 @@ edition = "2021"
 license = "BSD-3-Clause"
 description = "Efficiently concatenate strings without extra side-effects."
 repository = "https://github.com/Equim-chan/str-cat"
+documentation = "https://docs.rs/str-cat"
 keywords = ["concat", "string", "buffers"]
 categories = ["value-formatting"]
 
