@@ -6,8 +6,7 @@
 //! ```
 //! use str_cat::str_cat;
 //!
-//! let world = "World".to_owned(); // not a literal, so you can't use `concat!`
-//! let s = str_cat!("Hello", " ", world, "!");
+//! let s = str_cat!("Hello", " ", "World", "!");
 //! assert_eq!(s, "Hello World!");
 //! ```
 //!
@@ -15,10 +14,10 @@
 //!
 //! ```
 //! # let world = "World".to_owned();
-//! let mut s = String::with_capacity("Hello".len() + " ".len() + world.len() + "!".len());
+//! let mut s = String::with_capacity("Hello".len() + " ".len() + "World".len() + "!".len());
 //! s.push_str("Hello");
 //! s.push_str(" ");
-//! s.push_str(&world);
+//! s.push_str("World");
 //! s.push_str("!");
 //! ```
 //!
@@ -138,16 +137,16 @@
 /// ```
 #[macro_export]
 macro_rules! str_cat {
-    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*;) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident)*;) => {
         $input.reserve($additional);
         $($input.push_str($values_coerced);)*
     };
 
-    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident)*; $head:expr, $($tail:expr,)*) => {
         let value = $head;
         let value_coerced: &str = &*value;
         $additional += value_coerced.len();
-        $crate::str_cat!(@stack $input, $additional; $($values_coerced,)* value_coerced,; $($tail,)*);
+        $crate::str_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
@@ -184,16 +183,16 @@ macro_rules! str_cat {
 /// ```
 #[macro_export]
 macro_rules! path_cat {
-    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*;) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident)*;) => {
         $input.reserve($additional);
         $($input.push($values_coerced);)*
     };
 
-    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident)*; $head:expr, $($tail:expr,)*) => {
         let value = $head;
         let value_coerced = ::core::convert::AsRef::<::std::path::Path>::as_ref(&value);
         $additional += value_coerced.as_os_str().len();
-        $crate::path_cat!(@stack $input, $additional; $($values_coerced,)* value_coerced,; $($tail,)*);
+        $crate::path_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
@@ -230,16 +229,16 @@ macro_rules! path_cat {
 /// ```
 #[macro_export]
 macro_rules! os_str_cat {
-    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*;) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident)*;) => {
         $input.reserve($additional);
         $($input.push($values_coerced);)*
     };
 
-    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident)*; $head:expr, $($tail:expr,)*) => {
         let value = $head;
         let value_coerced = ::core::convert::AsRef::<::std::ffi::OsStr>::as_ref(&value);
         $additional += value_coerced.len();
-        $crate::os_str_cat!(@stack $input, $additional; $($values_coerced,)* value_coerced,; $($tail,)*);
+        $crate::os_str_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
@@ -274,16 +273,16 @@ macro_rules! os_str_cat {
 /// ```
 #[macro_export]
 macro_rules! vec_cat {
-    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*;) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident)*;) => {
         $input.reserve($additional);
         $($input.extend_from_slice($values_coerced);)*
     };
 
-    (@stack $input:ident, $additional:ident; $($values_coerced:ident,)*; $head:expr, $($tail:expr,)*) => {
+    (@stack $input:ident, $additional:ident; $($values_coerced:ident)*; $head:expr, $($tail:expr,)*) => {
         let value = $head;
         let value_coerced = &*value;
         $additional += value_coerced.len();
-        $crate::vec_cat!(@stack $input, $additional; $($values_coerced,)* value_coerced,; $($tail,)*);
+        $crate::vec_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
