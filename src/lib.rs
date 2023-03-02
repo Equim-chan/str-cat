@@ -99,6 +99,19 @@
 //! assert_eq!(s, "Hello World!123456");
 //! ```
 //!
+//! ## Implicit borrowing
+//! Just like [`format!`](format) and [`println!`](println),
+//! [`str_cat`](str_cat) automatically borrows the arguments for you, so you
+//! don't have to type that `&` yourself.
+//!
+//! ```
+//! # use str_cat::str_cat;
+//! let world = "World!".to_owned();
+//! let s = str_cat!("Hello ", world); // no need for `&`
+//! assert_eq!(s, "Hello World!");
+//! assert_eq!(world, "World!"); // not moved, still valid
+//! ```
+//!
 //! ## Variants
 //! There are also variants for [`PathBuf`](std::path::PathBuf),
 //! [`OsString`](std::ffi::OsString) and [`Vec`](Vec).
@@ -143,10 +156,13 @@ macro_rules! str_cat {
     };
 
     (@stack $input:ident, $additional:ident; $($values_coerced:ident)*; $head:expr, $($tail:expr,)*) => {
-        let value = $head;
-        let value_coerced: &str = &*value;
-        $additional += value_coerced.len();
-        $crate::str_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
+        match &$head {
+            value => {
+                let value_coerced: &str = &*value;
+                $additional += value_coerced.len();
+                $crate::str_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
+            }
+        }
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
@@ -189,10 +205,13 @@ macro_rules! path_cat {
     };
 
     (@stack $input:ident, $additional:ident; $($values_coerced:ident)*; $head:expr, $($tail:expr,)*) => {
-        let value = $head;
-        let value_coerced = ::core::convert::AsRef::<::std::path::Path>::as_ref(&value);
-        $additional += value_coerced.as_os_str().len();
-        $crate::path_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
+        match &$head {
+            value => {
+                let value_coerced = ::core::convert::AsRef::<::std::path::Path>::as_ref(&value);
+                $additional += value_coerced.as_os_str().len();
+                $crate::path_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
+            }
+        }
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
@@ -235,10 +254,13 @@ macro_rules! os_str_cat {
     };
 
     (@stack $input:ident, $additional:ident; $($values_coerced:ident)*; $head:expr, $($tail:expr,)*) => {
-        let value = $head;
-        let value_coerced = ::core::convert::AsRef::<::std::ffi::OsStr>::as_ref(&value);
-        $additional += value_coerced.len();
-        $crate::os_str_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
+        match &$head {
+            value => {
+                let value_coerced = ::core::convert::AsRef::<::std::ffi::OsStr>::as_ref(&value);
+                $additional += value_coerced.len();
+                $crate::os_str_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
+            }
+        }
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
@@ -279,10 +301,13 @@ macro_rules! vec_cat {
     };
 
     (@stack $input:ident, $additional:ident; $($values_coerced:ident)*; $head:expr, $($tail:expr,)*) => {
-        let value = $head;
-        let value_coerced = &*value;
-        $additional += value_coerced.len();
-        $crate::vec_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
+        match &$head {
+            value => {
+                let value_coerced = ::core::convert::AsRef::<[_]>::as_ref(&value);
+                $additional += value_coerced.len();
+                $crate::vec_cat!(@stack $input, $additional; $($values_coerced)* value_coerced; $($tail,)*);
+            }
+        }
     };
 
     ($input:expr; $($el:expr),+ $(,)?) => {{
